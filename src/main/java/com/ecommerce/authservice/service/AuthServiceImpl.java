@@ -5,6 +5,9 @@ import com.ecommerce.authservice.dto.LoginRequest;
 import com.ecommerce.authservice.dto.RegisterRequest;
 import com.ecommerce.authservice.entity.Role;
 import com.ecommerce.authservice.entity.User;
+import com.ecommerce.authservice.exception.DuplicateResourceException;
+import com.ecommerce.authservice.exception.InvalidCredentialsException;
+import com.ecommerce.authservice.exception.ResourceNotFoundException;
 import com.ecommerce.authservice.repository.RoleRepository;
 import com.ecommerce.authservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +28,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest loginRequest) {
         User user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Invalid email or password");
+            throw new InvalidCredentialsException("Invalid email or password");
         }
 
         return new AuthResponse("ACCESS_TOKEN_PLACEHOLDER", "REFRESH_TOKEN_PLACEHOLDER",
@@ -38,11 +41,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse register(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new DuplicateResourceException("Email already exists");
         }
 
         Role userRole = roleRepository.findByName("USER").orElseThrow(() ->
-                new RuntimeException("Default Role USER not found"));
+                new ResourceNotFoundException("Default Role USER not found"));
 
         User user = new User();
         user.setEmail(registerRequest.getEmail());
