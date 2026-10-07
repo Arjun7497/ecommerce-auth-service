@@ -14,7 +14,9 @@ import com.ecommerce.authservice.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Service
@@ -28,46 +30,59 @@ public class AuthServiceImpl implements AuthService {
     private final RefreshTokenService refreshTokenService;
 
 
+    @Transactional
     @Override
-    public AuthResponse login(LoginRequest loginRequest) {
-        User user = userRepository.findByEmail(loginRequest.getEmail())
+    public AuthResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
-        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
-        String role = user.getRoles().iterator().next().getName();
+        String role = user.getRoles().stream()
+                .findFirst()
+                .map(Role::getName)
+                .orElse("USER");
+
         String accessToken = jwtService.generateAccessToken(user.getEmail(), role);
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
         refreshTokenService.createRefreshToken(user, refreshToken);
+
         return new AuthResponse(accessToken, refreshToken, "Login successful");
     }
 
+    @Transactional
     @Override
-    public AuthResponse register(RegisterRequest registerRequest) {
-        if (userRepository.existsByEmail(registerRequest.getEmail())) {
+    public AuthResponse register(RegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Email already exists");
         }
 
-        Role userRole = roleRepository.findByName("USER").orElseThrow(() ->
-                new ResourceNotFoundException("Default Role USER not found"));
+        Role userRole = roleRepository.findByName("USER")
+                .orElseThrow(() -> new ResourceNotFoundException("Default role USER not found"));
 
         User user = new User();
-        user.setEmail(registerRequest.getEmail());
-        user.setFullName(registerRequest.getFullName());
-        user.setPasswordHash(passwordEncoder.encode(registerRequest.getPassword()));
-        user.setRoles(Set.of(userRole));
+        user.setFullName(request.getFullName());
+        user.setEmail(request.getEmail());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+
+        Set<Role> roles = new HashSet<>();
+        roles.add(userRole);
+        user.setRoles(roles);
 
         userRepository.save(user);
+
         String accessToken = jwtService.generateAccessToken(user.getEmail(), "USER");
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
         refreshTokenService.createRefreshToken(user, refreshToken);
+
         return new AuthResponse(accessToken, refreshToken, "User registered successfully");
     }
 
+    @Transactional
     @Override
     public AuthResponse refreshToken(String refreshToken) {
         refreshTokenService.validateRefreshToken(refreshToken);
@@ -76,7 +91,10 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid token user"));
 
-        String role = user.getRoles().iterator().next().getName();
+        String role = user.getRoles().stream()
+                .findFirst()
+                .map(Role::getName)
+                .orElse("USER");
         String newAccessToken = jwtService.generateAccessToken(email, role);
 
         return new AuthResponse(newAccessToken, refreshToken, "Token refreshed successfully");
