@@ -2,6 +2,7 @@ package com.ecommerce.authservice.controller;
 
 import com.ecommerce.authservice.dto.AuthResponse;
 import com.ecommerce.authservice.dto.LoginRequest;
+import com.ecommerce.authservice.dto.RefreshTokenRequest;
 import com.ecommerce.authservice.dto.RegisterRequest;
 import com.ecommerce.authservice.service.AuthService;
 import jakarta.validation.Valid;
@@ -29,5 +30,16 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(authService.refreshToken(request.getRefreshToken()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@Valid @RequestBody RefreshTokenRequest request) {
+        authService.logout(request.getRefreshToken());
+        return ResponseEntity.noContent().build();
     }
 }
