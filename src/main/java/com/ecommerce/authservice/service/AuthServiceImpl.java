@@ -33,7 +33,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     @Override
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findWithRolesByEmail(request.getEmail())
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
@@ -88,7 +88,7 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenService.validateRefreshToken(refreshToken);
 
         String email = jwtService.extractEmail(refreshToken);
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findWithRolesByEmail(email)
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid token user"));
 
         String role = user.getRoles().stream()
